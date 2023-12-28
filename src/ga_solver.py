@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import elitism
-import sudoku
+import src.elitism as elitism
+import src.sudoku as sudoku
 
 
 class GASolver:
@@ -143,11 +143,18 @@ class GASolver:
         #                                                       ngen=MAX_GENERATIONS, stats=stats, halloffame=hof,
         #                                                       verbose=True)
 
-        solution = self.n_sudoku.get_solution(hof.items[0])
+        self.solution = self.n_sudoku.get_solution(hof.items[0])
         if hof.items[0].fitness.values[0] == 0:
-            self.final_callback(True, solution)
+            self.solved = True
+            if self.final_callback:
+                self.final_callback(True, self.solution)
         else:
-            self.final_callback(False)
+            self.solvable = False
+            if self.final_callback:
+                self.final_callback(False)
+
+    def get_solution(self):
+        return self.solution, self.solved
 
 
         # print hall of fame members info:

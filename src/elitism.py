@@ -42,18 +42,21 @@ def eaSimpleWithElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
             mutpb = save_mutpb
         else:
             stuck_count = 0
-            status_callback(f'radiation is {radiation}')
+            if status_callback:
+                status_callback(f'radiation is {radiation}')
 
         # Select the next generation individuals
         if stuck[0] < stuck_count:
             if stuck[1] == 'comet':
                 # Generate new population for non-hof (Comet-Strike)
-                status_callback('the comet strikes')
+                if status_callback:
+                    status_callback('the comet strikes')
                 offspring = toolbox.populationCreator(len(population) - 3)
                 offspring.extend(halloffame.items[:3])
                 halloffame.clear()
             if stuck[1] == 'chernobyl':
-                status_callback('radiation leak')
+                if status_callback:
+                    status_callback('radiation leak')
                 mutpb = 0.5
                 radiation = stuck[0]
             stuck_count = 0
@@ -95,8 +98,8 @@ def eaSimpleWithElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
                 stuck_count = 0
 
         if radiation == 0:
-            pass
-            status_callback(f'stuck count is {stuck_count}')
+            if status_callback:
+                status_callback(f'stuck count is {stuck_count}')
 
         last_min = new_min
 
