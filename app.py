@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import src.greedy_sudoku as gs
 import src.ga_solver as ga
-from itertools import chain
 import time
+import altair as alt
 
 
 st.title('Sudoku Solver')
@@ -43,7 +43,7 @@ def run_greedy(data):
             containing the user input (i.e. pre-defined fields).
 
     Returns:
-        tuple: Tuple containing 
+        tuple ( tuple( array, boolean ), array ): Tuple containing 
             - a tuple of solution as a 9x9 array with solved fields plus True or False,
             indicating whether the puzzle has been solved.
             - a 9x9 array with valid field options as lists
@@ -66,20 +66,23 @@ def run_ga_solver(solution_data, possibilities_data):
         possibilities_data (array): 9x9 array of lists with valid field options
 
     Returns:
-        tuple(array, boolean): tuple of 9x9 array with solved fields and boolean variable
-            indicating whether problems was solved.
+        tuple(array, boolean, deap.tools.Logbook): 
+            - 9x9 array with solved fields 
+            - boolean variable indicating whether problems was solved 
+            - logbook containing statistics on genetic algorithm run
     """
     with st.spinner('Running genetic algorithm ...'):
         ga_problem = ga.GASolver(
             solution_data,
             possibilities_data,
-            # status_callback=self.update_status,
+            # status_callback=st.write,
             # final_callback=self.final_result
         )
         ga_problem.ga_solve()
         solution, solved = ga_problem.get_solution()
+        logbook = ga_problem.get_stats()
 
-    return solution, solved
+    return solution, solved, logbook
 
 def hide_zero(styled, props=''):
     return np.where(styled == 0, props, '')
@@ -88,11 +91,11 @@ def mark_input(styled, props=''):
     checkers = list()
     for i in range(9):
         if i // 3 % 2 == 0:
-            first = 'background-color:#f0f2f6;'
-            second = 'background-color:white;'
+            first = 'background-color:#f0f2f6; color:black'
+            second = 'background-color:white; color:black'
         else:
-            first = 'background-color:white;'
-            second = 'background-color:#f0f2f6;'
+            first = 'background-color:white; color:black'
+            second = 'background-color:#f0f2f6; color:black'
         check_line = [first if j // 3 % 2 == 0 else second for j in range(9)]
         checkers.append(check_line)
     checkers = pd.DataFrame(checkers, columns=range(1, 10), index=range(1, 10))
@@ -135,7 +138,7 @@ def prep_input(data):
 # run script for start phase
 if st.session_state['phase'] == 'start':
     st.markdown('Enter your Sudoku problem and press start!')
-    preselect = st.selectbox('Chose example', options=['Easy', 'Hard', 'None'])
+    preselect = st.sidebar.selectbox('Start with an example', options=['Easy', 'Hard', 'None'])
     with st.form('sudoku_input'):
         if preselect == 'None':
             data = pd.DataFrame({i:['']*9 for i in range(1,10)}, index=range(1, 10))
@@ -170,10 +173,11 @@ elif st.session_state['phase'] == 'start_solve':
 
 # run script for ga phase
 elif st.session_state['phase'] == 'start_ga':
-    ga_solution, solved = run_ga_solver(st.session_state['solution'], st.session_state['possibilities'])
+    ga_solution, solved, logbook = run_ga_solver(st.session_state['solution'], st.session_state['possibilities'])
+    st.session_state['solved'] = 'ga'
+    st.session_state['ga_logbook'] = logbook
 
     if solved:
-        st.session_state['solved'] = 'ga'
         st.session_state['ga_solution'] = ga_solution
         st.session_state['solution'] = ga_solution
 
@@ -190,17 +194,44 @@ elif st.session_state['phase'] == 'final':
     tabs = st.tabs(tab_list)
 
     with tabs[0]:
-        st.markdown('#### These fields could be solved by the algorithm:')
+        st.markdown('These fields could be solved by the algorithm:')
         styled = pd.DataFrame(st.session_state.solution, columns=range(1, 10), index=list(range(1, 10))).style.apply(mark_input, axis=None, props='background-color:#a3a8b4; color:white')
         st.markdown(styled.hide(axis = 0).hide(axis = 1).to_html(), unsafe_allow_html=True)
     with tabs[1]:
-        st.markdown('#### Valid values could be reduced to these options:')
+        st.markdown('Valid values could be reduced to these options:')
         st.dataframe(st.session_state.possibilities)
 
     if st.session_state.solved == 'ga':
         with tabs[2]:
-            styled_ga = pd.DataFrame(st.session_state.solution, columns=range(1, 10), index=list(range(1, 10))).style.apply(mark_input, axis=None, props='background-color:#a3a8b4; color:white')
-            st.markdown(styled_ga.hide(axis = 0).hide(axis = 1).to_html(), unsafe_allow_html=True)
+            # plot statistics:
+            min_fitness_values, mean_fitness_values = st.session_state.ga_logbook.select("min", "avg")
+            fit_df = pd.DataFrame(
+                {
+                    'Min Fitness': min_fitness_values,
+                    'Avg. Fitness': mean_fitness_values,
+                    'Generation': list(range(1, len(mean_fitness_values) + 1))
+                }
+            )
+            fit_df = fit_df.melt(
+                id_vars='Generation', 
+                value_vars=['Min Fitness', 'Avg. Fitness'],
+                value_name='Fitness',
+                var_name='Type')
+
+            chart = alt.Chart(
+                fit_df, 
+                title=alt.Title(
+                    'Min and Average fitness over Generations',
+                    align='center',
+                    anchor='middle'
+                    )
+                ).mark_line().encode(
+                x=alt.X('Generation:Q'),
+                y=alt.Y('Fitness:Q'),
+                color=alt.Color('Type')
+            )
+
+            st.altair_chart(chart, use_container_width=True)
     
     # for key in st.session_state.keys():
     #     del st.session_state[key]
