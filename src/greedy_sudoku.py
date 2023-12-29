@@ -89,7 +89,9 @@ class GreedySolver:
                                 break
 
     def get_solution(self):
-        return self.solution.tolist()
+        solution = self.solution.tolist()
+        solved = False if any(x == 0 for x in chain(*solution)) else True
+        return solution, solved
 
     def get_possibilities(self):
         return self.possibilities

@@ -4,11 +4,9 @@ from deap import tools
 import random
 
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-import elitism
-import sudoku
+import src.elitism as elitism
+import src.sudoku as sudoku
 
 
 class GASolver:
@@ -72,42 +70,7 @@ class GASolver:
     # fitness calculation - get the number of row or square violations for a given option:
     def get_violations_count(self, individual):
         violations = self.n_sudoku.get_position_violation_count(individual)
-        return violations,  # return a tuple
-
-    @staticmethod
-    def multiline_upmx(ind1, ind2, indpb):
-        pairs = list(zip(ind1, ind2))
-        for i in range(len(pairs)):
-            ind_i1, ind_i2 = tools.cxUniformPartialyMatched(pairs[i][0], pairs[i][1], indpb)
-            ind1[i] = ind_i1
-            ind2[i] = ind_i2
-
-        return ind1, ind2
-
-    @staticmethod
-    def swap_cx(ind1, ind2, indpb):
-        for i in range(len(ind1)):
-            if random.random() <= indpb:
-                ind1[i], ind2[i] = ind2[i], ind1[i]
-
-        return ind1, ind2
-
-    @staticmethod
-    def multiline_shuffle_ind(ind, indpb):
-        for i in range(len(ind)):
-            ind_i = tools.mutShuffleIndexes(ind[i], indpb)
-            ind[i] = ind_i[0]
-
-        return ind,
-
-    @staticmethod
-    def simple_swap_mutation(ind, indpb):
-        for i in range(len(ind)):
-            if random.random() <= indpb:
-                id1, id2 = random.sample(range(len(ind[i])), 2)
-                ind[i][id1], ind[i][id2] = ind[i][id2], ind[i][id1]
-
-        return ind,
+        return violations,  # evaluate expects a tuple
 
     # Precise definition of equality of two arrays for hall of fame algorithm
     @staticmethod
@@ -120,7 +83,6 @@ class GASolver:
 
     # Genetic Algorithm flow:
     def ga_solve(self):
-        # print(self.n_sudoku.possibility_range)
         # create initial population (generation 0):
         new_population = self.toolbox.populationCreator(n=self.population_size)
 
@@ -139,39 +101,22 @@ class GASolver:
                                                               status_callback=self.status_callback,
                                                               stuck=(50, 'chernobyl'))
 
-        # new_population, logbook = algorithms.eaSimple(new_population, toolbox, cxpb=P_CROSSOVER, mutpb=P_MUTATION,
-        #                                                       ngen=MAX_GENERATIONS, stats=stats, halloffame=hof,
-        #                                                       verbose=True)
-
-        solution = self.n_sudoku.get_solution(hof.items[0])
+        self.solution = self.n_sudoku.get_solution(hof.items[0])
+        self.logbook = logbook
         if hof.items[0].fitness.values[0] == 0:
-            self.final_callback(True, solution)
+            self.solved = True
+            if self.final_callback:
+                self.final_callback(True, self.solution)
         else:
-            self.final_callback(False)
+            self.solvable = False
+            if self.final_callback:
+                self.final_callback(False)
 
-
-        # print hall of fame members info:
-        print("- Best solutions are:")
-        for i in range(self.hall_of_fame_size):
-            print(i, ": ", hof.items[i].fitness.values[0], " -> ", hof.items[i])
-
-        # plot statistics:
-        min_fitness_values, mean_fitness_values = logbook.select("min", "avg")
-        plt.figure(1)
-        sns.set_style("whitegrid")
-        plt.plot(min_fitness_values, color='red')
-        plt.plot(mean_fitness_values, color='green')
-        plt.xlabel('Generation')
-        plt.ylabel('Min / Average Fitness')
-        plt.title('Min and Average fitness over Generations')
-
-        # plot best solution:
-        sns.set_style("whitegrid", {'axes.grid' : False})
-        self.n_sudoku.plot_solution(hof.items[0])
-
-        # show both plots:
-        plt.show()
-
+    def get_solution(self):
+        return self.solution, self.solved
+    
+    def get_stats(self):
+        return self.logbook
 
 if __name__=="__main__":
     SOLVABLE = [
