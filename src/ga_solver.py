@@ -31,6 +31,7 @@ class GASolver:
         self.p_mutation = p_mutation
         self.status_callback = status_callback
         self.final_callback = final_callback
+        self.solved = False
 
         random.seed(random_seed)
 
@@ -40,6 +41,14 @@ class GASolver:
         self.toolbox = base.Toolbox()
 
         # define a single objective, minimizing fitness strategy:
+        try:
+            # this is to avoid a run-time warning that crops up on reruns
+            # already reported as a bug on github: https://github.com/DEAP/deap/issues/117
+            del creator.FitnessMin
+            del creator.Individual
+        except:
+            pass
+
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 
         # create the Individual class based on list of lists:

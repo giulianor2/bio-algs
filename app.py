@@ -6,9 +6,6 @@ import src.ga_solver as ga
 import time
 import altair as alt
 
-
-st.title('Sudoku Solver')
-
 # if 'count' not in st.session_state:
 #     st.session_state['count'] = 0
 
@@ -137,8 +134,43 @@ def prep_input(data):
 
 # run script for start phase
 if st.session_state['phase'] == 'start':
+    st.title('Welcome to a different kind of Sudoku Solver!')
+    st.subheader('Hello Data Science Enthusiast :wave:')
+    st.markdown(
+        """
+        **Genetic Algorithms** are a powerful weapon in an optimizer's armory. But can they cope
+        with a structured (and hard) problem like a **Sudoku Puzzle**? :thinking_face:  
+        
+        **Yes they can**! :thumbsup: and you can try this for yourself whith this app!     
+        
+        We will take you through a solving process allowing you to play whith the Genetic Algorithm part. 
+        You will start by entering your own Sudoku problem or selecting
+        from a small range of examples.
+        
+        Next a greedy alogorithm will narrow down the potential candidate numbers 
+        for each cell. This is essential, as the sheer number of solution candidates overwhelms
+        a simple genetic algorithm approach.  
+        
+        Now you will able to adjust parameters for a genetic algorithm and see how this impacts
+        its performance.  
+        
+        Finally you will be able to inspect the results of your algorithm
+        and either rerun it with different parameters or start out with a new problem.  
+
+        And now withouth further ado ...
+        """
+    )
+    start = st.button("Let's get started :rocket:", type='primary')
+    if start:
+        set_phase('input')
+        st.rerun()
+
+
+# run script for start phase
+if st.session_state['phase'] == 'input':
+    st.title('Sudoku Solver')
     st.markdown('Enter your Sudoku problem and press start!')
-    preselect = st.sidebar.selectbox('Start with an example', options=['Easy', 'Hard', 'None'])
+    preselect = st.sidebar.selectbox('Start with an example', options=['Hard', 'Easy', 'None'])
     with st.form('sudoku_input'):
         if preselect == 'None':
             data = pd.DataFrame({i:['']*9 for i in range(1,10)}, index=range(1, 10))
@@ -157,6 +189,7 @@ if st.session_state['phase'] == 'start':
 
 # run script for greedy phase
 elif st.session_state['phase'] == 'start_solve':
+    st.title('Sudoku Solver')
     greedy_solved, greedy_possibilities = run_greedy(st.session_state.input)
     greedy_solution, solved = greedy_solved
     st.session_state['greedy_solution'] = greedy_solution
@@ -164,7 +197,7 @@ elif st.session_state['phase'] == 'start_solve':
     st.session_state['possibilities'] = greedy_possibilities
     
     if not solved:
-        set_phase('start_ga')
+        set_phase('configure_ga')
         st.rerun()
     else:
         st.session_state['solved'] = 'greedy'
@@ -172,7 +205,49 @@ elif st.session_state['phase'] == 'start_solve':
         st.rerun()
 
 # run script for ga phase
-elif st.session_state['phase'] == 'start_ga':
+elif st.session_state['phase'] == 'configure_ga':
+    with st.form('Select options for genetic algorithm'):
+        generations = st.slider(
+            'Number of Generations', 
+            min_value=50,
+            max_value=1000,
+            value=500,
+            step=50
+            )
+        population = st.slider(
+            'Population Size', 
+            min_value=50,
+            max_value=1000,
+            value=500,
+            step=50
+            )
+        hof = st.slider(
+            'Hall of Fame Size', 
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=1
+        )
+        p_crossover = st.slider(
+            'Probability of Mating',
+            min_value=0.1,
+            max_value=1.0,
+            step=0.05,
+            value=0.9
+        )
+        p_crossover = st.slider(
+            'Probability of Mutation',
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
+            value=0.2
+        )
+        run_ga = st.form_submit_button(label='Run Algorithm')
+        if run_ga:
+            set_phase('start_ga')
+            st.rerun()
+
+elif st.session_state['phase'] == 'start_ga':        
     ga_solution, solved, logbook = run_ga_solver(st.session_state['solution'], st.session_state['possibilities'])
     st.session_state['solved'] = 'ga'
     st.session_state['ga_logbook'] = logbook
@@ -229,7 +304,7 @@ elif st.session_state['phase'] == 'final':
                 x=alt.X('Generation:Q'),
                 y=alt.Y('Fitness:Q'),
                 color=alt.Color('Type')
-            )
+            ).interactive()
 
             st.altair_chart(chart, use_container_width=True)
     
