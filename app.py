@@ -114,17 +114,17 @@ def run_ga_solver(solution_data, possibilities_data, ga_params):
             - boolean variable indicating whether problems was solved 
             - logbook containing statistics on genetic algorithm run
     """
-    with st.spinner('Running genetic algorithm ...'):
-        ga_problem = ga.GASolver(
-            solution_data,
-            possibilities_data,
-            **ga_params
-            # status_callback=st.write,
-            # final_callback=self.final_result
-        )
-        ga_problem.ga_solve()
-        solution, solved = ga_problem.get_solution()
-        logbook = ga_problem.get_stats()
+    # with st.status('Running genetic algorithm ...'):
+    ga_problem = ga.GASolver(
+        solution_data,
+        possibilities_data,
+        status_callback=st.write,
+        **ga_params,
+        # final_callback=self.final_result
+    )
+    ga_problem.ga_solve()
+    solution, solved = ga_problem.get_solution()
+    logbook = ga_problem.get_stats()
 
     return solution, solved, logbook
 
@@ -233,79 +233,143 @@ elif st.session_state['phase'] == 'start_solve':
 
 # run script for ga phase
 elif st.session_state['phase'] == 'configure_ga':
-    with st.form('Select options for genetic algorithm'):
-        st.session_state['ga_params'] = {
-            'generations': 500,
-            'population': 500,
-            'hof_size': 50,
-            'p_mating': 0.9,
-            'p_mutation': 0.2
-        }
-        generations = st.slider(
-            'Number of Generations', 
-            min_value=50,
-            max_value=1000,
-            value=st.session_state['ga_params']['generations'],
-            step=50
-            )
-        population = st.slider(
-            'Population Size', 
-            min_value=50,
-            max_value=1000,
-            value=st.session_state['ga_params']['population'],
-            step=50
-            )
-        hof_size = st.slider(
-            'Hall of Fame Size', 
-            min_value=0,
-            max_value=100,
-            value=st.session_state['ga_params']['hof_size'],
-            step=1
-        )
-        p_mating = st.slider(
-            'Probability of Mating',
-            min_value=0.1,
-            max_value=1.0,
-            value=st.session_state['ga_params']['p_mating'],
-            step=0.05
-        )
-        p_mutation = st.slider(
-            'Probability of Mutation',
-            min_value=0.0,
-            max_value=1.0,
-            value=st.session_state['ga_params']['p_mutation'],
-            step=0.05
-        )
-        run_ga = st.form_submit_button(label='Run Algorithm')
-        if run_ga:
+    st.title('Sudoku Solver')
+    tabs = st.tabs(['Output Greedy Algorithm', 'Set Genetic Algorithm Parameters'])
+
+    with tabs[0]:
+        st.markdown('Valid solutions per field could be reduced to these options:')
+        st.dataframe(st.session_state.possibilities)
+
+    with tabs[1]:
+        st.subheader('Adjust parameters for the Genetic Algorithm!')
+        with st.form('ga_options_select', border=False, clear_on_submit=True):
             st.session_state['ga_params'] = {
-                'generations': generations,
-                'population': population,
-                'hof_size': hof_size,
-                'p_mating': p_mating,
-                'p_mutation': p_mutation
+                'generations': 500,
+                'population': 1000,
+                'hof_size': 50,
+                'p_mating': 0.9,
+                'p_mutation': 0.2,
+                'shock_event': 'Radiation Leak',
+                'stuck_count': 50
             }
-            set_phase('start_ga')
-            st.rerun()
+            st.write(
+                'The number of generations sets the maximum number of rounds the algorithm will run. '
+                'Set this conservatively to avoid overly long run times.'
+                )
+            generations = st.slider(
+                'Number of Generations', 
+                min_value=50,
+                max_value=1000,
+                value=st.session_state['ga_params']['generations'],
+                step=50
+                )
+            st.write(
+                'The population size determines how many solution candidates exist in paralllel. '
+                'Higher values increase the probability of finding a solution earlier - '
+                'while increasing computational cost.'
+                )
+            population = st.slider(
+                'Population Size', 
+                min_value=50,
+                max_value=1000,
+                value=st.session_state['ga_params']['population'],
+                step=50
+                )
+            st.write(
+                'The hall of fame size determines how many of the fittest individuals are carried over '
+                'into the next generation unaltered. Helps to preserve progress, '
+                'while increasing the risk of getting stuck in local optima. '
+                )
+            hof_size = st.slider(
+                'Hall of Fame Size', 
+                min_value=0,
+                max_value=100,
+                value=st.session_state['ga_params']['hof_size'],
+                step=1
+            )
+            st.write(
+                'The probability of mating determines how often the fittest "parent" individuals are combined '
+                'to generate "offspring" individuals in the next generation.'
+                )
+            p_mating = st.slider(
+                'Probability of Mating',
+                min_value=0.1,
+                max_value=1.0,
+                value=st.session_state['ga_params']['p_mating'],
+                step=0.05
+            )
+            st.write(
+                'The probability of mutation determines how likely individuals are altered in a generation. '
+                'While this drives the evolutionary process, high mutation rates can also interfere '
+                'whith the continuous optimization process. Adjust sparingly!'
+                )
+            p_mutation = st.slider(
+                'Probability of Mutation',
+                min_value=0.0,
+                max_value=1.0,
+                value=st.session_state['ga_params']['p_mutation'],
+                step=0.05
+            )
+            st.markdown(
+                    """
+                    To avoid getting caught in local minima you can chose one of two "shock" events.
+                    - **Radiation Leak** drastically increases mutation probability to 0.5 over a number of rounds determined by "Stuck Rounds".
+                    - **Comet Strike** wipes out all individuals apart from the hall of fame and generates a new random population.
+                    """
+                )
+            shock_event = st.radio('Shock Event', ['None', 'Radiation Leak', 'Comet Strike'], index=1)
+            st.write(
+                'Stuck rounds is the number of rounds the best fitness value must not improve before the shock event kicks in. '
+                'Comparable to "early stopping rounds" in machine learning. No effect if shock event is "None".'
+                )
+            stuck_count = st.slider(
+                'Stuck Rounds',
+                min_value=10,
+                max_value=100,
+                value=st.session_state['ga_params']['stuck_count'],
+                step=10
+            )
+            run_ga = st.form_submit_button(label='Run Algorithm :runner:', type='primary')
+            if run_ga:
+                st.session_state['ga_params'] = {
+                    'generations': generations,
+                    'population': population,
+                    'hof_size': hof_size,
+                    'p_mating': p_mating,
+                    'p_mutation': p_mutation,
+                    'shock_event': shock_event,
+                    'stuck_count': stuck_count
+                }
+                set_phase('start_ga')
+                st.rerun()
+    
 
 elif st.session_state['phase'] == 'start_ga':
-    ga_solution, solved, logbook = run_ga_solver(
-        st.session_state['solution'], 
-        st.session_state['possibilities'],
-        st.session_state['ga_params']
-        )
+    st.title('Sudoku Solver')
+    with st.status('Running genetic algorithm ...') as status:
+        st.write('Starting algorithm')
+        ga_solution, solved, logbook = run_ga_solver(
+            st.session_state['solution'], 
+            st.session_state['possibilities'],
+            st.session_state['ga_params']
+            )
+        set_phase('final')
+        st.write('Finalized algorithm')
+        status.update(label="Optimization complete!", state="complete")
+
     st.session_state['solved'] = 'ga'
     st.session_state['ga_logbook'] = logbook
 
     if solved:
         st.session_state['ga_solution'] = ga_solution
         st.session_state['solution'] = ga_solution
-
-    set_phase('final')
-    st.rerun()
+    
+    # st.rerun()
+    st.button('Show me the result')
 
 # present final result 
 elif st.session_state['phase'] == 'final': 
+    st.title('Sudoku Solver')
     tab_list = ['Final Result', 'Output Greedy Algorithm']
     greedy_message = 'Valid solutions per field could be reduced to these options:'
 
@@ -359,6 +423,7 @@ elif st.session_state['phase'] == 'final':
             ).interactive()
 
             st.altair_chart(chart, use_container_width=True)
-    
+    else: 
+        st.title('Runtime Error')
     # for key in st.session_state.keys():
     #     del st.session_state[key]
