@@ -20,6 +20,9 @@ class GASolver:
                  hof_size=50,
                  p_mating=0.9,
                  p_mutation=0.2,
+                 shock_event='Radiation Leak',
+                 stuck_count=50,
+                 verbosity=20,
                  random_seed=42,
                  status_callback=None,
                  final_callback=None
@@ -29,6 +32,9 @@ class GASolver:
         self.hall_of_fame_size = hof_size
         self.p_crossover = p_mating
         self.p_mutation = p_mutation
+        self.shock_event = shock_event
+        self.stuck_count = stuck_count
+        self.verbosity = verbosity
         self.status_callback = status_callback
         self.final_callback = final_callback
         self.solved = False
@@ -104,11 +110,18 @@ class GASolver:
         hof = tools.HallOfFame(self.hall_of_fame_size, similar=self.np_equal)
 
         # perform the Genetic Algorithm flow with hof feature added:
-        new_population, logbook = elitism.eaSimpleWithElitism(new_population, self.toolbox, cxpb=self.p_crossover,
-                                                              mutpb=self.p_mutation, ngen=self.max_generations,
-                                                              stats=stats, halloffame=hof,
-                                                              status_callback=self.status_callback,
-                                                              stuck=(50, 'chernobyl'))
+        new_population, logbook = elitism.eaSimpleWithElitism(
+            new_population, 
+            self.toolbox, 
+            cxpb=self.p_crossover,
+            mutpb=self.p_mutation, 
+            ngen=self.max_generations,
+            stats=stats, 
+            halloffame=hof,
+            status_callback=self.status_callback,
+            stuck=(self.stuck_count, self.shock_event),
+            verbosity = self.verbosity
+        )
 
         self.solution = self.n_sudoku.get_solution(hof.items[0])
         self.logbook = logbook
