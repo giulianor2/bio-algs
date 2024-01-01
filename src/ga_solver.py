@@ -15,22 +15,23 @@ class GASolver:
     def __init__(self,
                  sudoku_grid,
                  sudoku_possibilities,
-                 population_size=1000,
-                 max_generations=500,
-                 hall_of_fame_size=50,
-                 p_crossover=0.9,
+                 population=1000,
+                 generations=500,
+                 hof_size=50,
+                 p_mating=0.9,
                  p_mutation=0.2,
                  random_seed=42,
                  status_callback=None,
                  final_callback=None
                  ):
-        self.population_size = population_size
-        self.max_generations = max_generations
-        self.hall_of_fame_size = hall_of_fame_size
-        self.p_crossover = p_crossover
+        self.population_size = population
+        self.max_generations = generations
+        self.hall_of_fame_size = hof_size
+        self.p_crossover = p_mating
         self.p_mutation = p_mutation
         self.status_callback = status_callback
         self.final_callback = final_callback
+        self.solved = False
 
         random.seed(random_seed)
 
@@ -40,6 +41,14 @@ class GASolver:
         self.toolbox = base.Toolbox()
 
         # define a single objective, minimizing fitness strategy:
+        try:
+            # this is to avoid a run-time warning that crops up on reruns
+            # already reported as a bug on github: https://github.com/DEAP/deap/issues/117
+            del creator.FitnessMin
+            del creator.Individual
+        except:
+            pass
+
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 
         # create the Individual class based on list of lists:
