@@ -114,7 +114,6 @@ def run_ga_solver(solution_data, possibilities_data, ga_params):
             - boolean variable indicating whether problems was solved 
             - logbook containing statistics on genetic algorithm run
     """
-    # with st.status('Running genetic algorithm ...'):
     ga_problem = ga.GASolver(
         solution_data,
         possibilities_data,
@@ -128,7 +127,15 @@ def run_ga_solver(solution_data, possibilities_data, ga_params):
 
     return solution, solved, logbook
 
-def mark_input(styled, props=''):
+def prettify_grid(styled):
+    """Builds and returns a dataframe with CSS format strings to style final sudoku grid.
+
+    Args:
+        styled (any): Not used in function, though delivered by caller
+
+    Returns:
+        pd.DataFrame: dataframe with CSS format strings to be used for sudoku grid
+    """
     checkers = list()
     for i in range(9):
         if i // 3 % 2 == 0:
@@ -141,25 +148,29 @@ def mark_input(styled, props=''):
         checkers.append(check_line)
     checkers = pd.DataFrame(checkers, columns=range(1, 10), index=range(1, 10))
     initial = (st.session_state.input > 0).to_numpy()
-    checkers = checkers.mask(initial, props)
+    checkers = checkers.mask(initial, 'background-color:#a3a8b4; color:white')
     return checkers
 
-# short-cut for development phase only, remove before deployment
 def prep_input(data):
+    """
+    Takes in 9x9 array and returns dataframe for solution process.
+    Used to format examples for input form.
+
+    Args:
+        data (array): 9x9 array of integers between 0 and 9.
+
+    Returns:
+        pd.DataFrame: 9x9 dataframe with strings of integers between 1 and 9 plus empty strings.
+    """
     df = pd.DataFrame(data, index=range(1, 10), columns=range(1, 10))
     df = df.astype(str)
     df = df.mask(df=='0', '')
     return df
 
-# prepare app for phased run
-if 'phase' not in st.session_state:
-    st.session_state['phase'] = 'start'
-
-if 'solved' not in st.session_state:
-    st.session_state['solved'] = 'not_solved'
-
-# run script for start phase
-if st.session_state['phase'] == 'start':
+def run_start():
+    """
+    Runs script for start phase.
+    """
     st.title('Welcome to a different kind of Sudoku Solver!')
     st.subheader('Hello Data Science Enthusiast :wave:')
     st.markdown(
@@ -188,9 +199,10 @@ if st.session_state['phase'] == 'start':
         set_phase('input')
         st.rerun()
 
-
-# run script for start phase
-if st.session_state['phase'] == 'input':
+def run_input():
+    """
+    Runs script for input phase.
+    """
     st.title('Sudoku Solver')
     st.markdown('Enter your Sudoku problem and press start!')
     preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Example 1', 'Example 2', 'Example 3', 'FAIL'])
@@ -203,8 +215,8 @@ if st.session_state['phase'] == 'input':
             data = prep_input(SUDOKU2)
         elif preselect == 'Example 3':
             data = prep_input(SUDOKU3)
-        elif preselect == 'FAIL':
-            data = prep_input(FAIL)
+        # elif preselect == 'FAIL':
+        #     data = prep_input(FAIL)
         input = st.data_editor(data=data, num_rows='fixed', key='data_editor')
         submitted = st.form_submit_button(label='Start :runner:', type='primary')
         # TODO: add validity check here
@@ -214,8 +226,10 @@ if st.session_state['phase'] == 'input':
             set_phase('start_solve')
             st.rerun()
 
-# run script for greedy phase
-elif st.session_state['phase'] == 'start_solve':
+def run_start_solve():
+    """
+    Runs script for greed solution phase.
+    """
     st.title('Sudoku Solver')
     greedy_solved, greedy_possibilities = run_greedy(st.session_state.input)
     greedy_solution, solved = greedy_solved
@@ -228,168 +242,164 @@ elif st.session_state['phase'] == 'start_solve':
         st.rerun()
     else:
         st.session_state['solved'] = 'greedy'
-        set_phase('final')
+        set_phase('start_ga')
         st.rerun()
 
-# run script for ga phase
-elif st.session_state['phase'] == 'configure_ga':
+def run_configure_ga():
+    """
+    Runs script for genetic algorithm configuration phase.    
+    """
     st.title('Sudoku Solver')
-    tabs = st.tabs(['Output Greedy Algorithm', 'Set Genetic Algorithm Parameters'])
+    st.markdown('The greedy algorithm has reduced the solution possibilities per field to these options:')
+    st.dataframe(st.session_state.possibilities)
+    st.subheader('Adjust parameters for the Genetic Algorithm!')
 
-    with tabs[0]:
-        st.markdown('Valid solutions per field could be reduced to these options:')
-        st.dataframe(st.session_state.possibilities)
-
-    with tabs[1]:
-        st.subheader('Adjust parameters for the Genetic Algorithm!')
-        with st.form('ga_options_select', border=False, clear_on_submit=True):
+    with st.form('ga_options_select', border=False):
+        st.session_state['ga_params'] = {
+            'generations': 500,
+            'population': 1000,
+            'hof_size': 50,
+            'p_mating': 0.9,
+            'p_mutation': 0.2,
+            'shock_event': 'Radiation Leak',
+            'stuck_count': 50
+        }        
+        generations = st.slider(
+            'Number of Generations', 
+            min_value=50,
+            max_value=1000,
+            value=st.session_state['ga_params']['generations'],
+            step=50
+            )
+        st.write(
+            'The number of generations sets the maximum number of rounds the algorithm will run. '
+            'Set this conservatively to avoid overly long run times.'
+            )        
+        population = st.slider(
+            'Population Size', 
+            min_value=50,
+            max_value=1000,
+            value=st.session_state['ga_params']['population'],
+            step=50
+            )
+        st.write(
+            'The population size determines how many solution candidates exist in paralllel. '
+            'Higher values increase the probability of finding a solution earlier - '
+            'while increasing computational cost.'
+            )
+        hof_size = st.slider(
+            'Hall of Fame Size', 
+            min_value=0,
+            max_value=100,
+            value=st.session_state['ga_params']['hof_size'],
+            step=1
+        )
+        st.write(
+            'The hall of fame size determines how many of the fittest individuals are carried over '
+            'into the next generation unaltered. Helps to preserve progress, '
+            'while increasing the risk of getting stuck in local optima. '
+            )
+        p_mating = st.slider(
+            'Probability of Mating',
+            min_value=0.1,
+            max_value=1.0,
+            value=st.session_state['ga_params']['p_mating'],
+            step=0.05
+        )
+        st.write(
+            'The probability of mating determines how often the fittest "parent" individuals are combined '
+            'to generate "offspring" individuals in the next generation.'
+            )
+        p_mutation = st.slider(
+            'Probability of Mutation',
+            min_value=0.0,
+            max_value=1.0,
+            value=st.session_state['ga_params']['p_mutation'],
+            step=0.05
+        )
+        st.write(
+            'The probability of mutation determines how likely individuals are altered in a generation. '
+            'While this drives the evolutionary process, high mutation rates can also interfere '
+            'whith the continuous optimization process. Adjust sparingly!'
+            )
+        shock_event = st.radio('Shock Event', ['None', 'Radiation Leak', 'Comet Strike'], index=1)
+        st.markdown(
+                """
+                To avoid getting caught in local minima you can chose one of two "shock" events.
+                - **Radiation Leak** drastically increases mutation probability to 0.5 over a number of rounds determined by "Stuck Rounds".
+                - **Comet Strike** wipes out all individuals apart from the hall of fame and generates a new random population.
+                """
+            )
+        stuck_count = st.slider(
+            'Stuck Rounds',
+            min_value=10,
+            max_value=100,
+            value=st.session_state['ga_params']['stuck_count'],
+            step=10
+        )
+        st.write(
+            'Stuck rounds is the number of rounds the best fitness value must not improve before the shock event kicks in. '
+            'Comparable to "early stopping rounds" in machine learning. No effect if shock event is "None".'
+            )
+        run_ga = st.form_submit_button(label='Run Algorithm :runner:', type='primary')
+        if run_ga:
             st.session_state['ga_params'] = {
-                'generations': 500,
-                'population': 1000,
-                'hof_size': 50,
-                'p_mating': 0.9,
-                'p_mutation': 0.2,
-                'shock_event': 'Radiation Leak',
-                'stuck_count': 50
+                'generations': generations,
+                'population': population,
+                'hof_size': hof_size,
+                'p_mating': p_mating,
+                'p_mutation': p_mutation,
+                'shock_event': shock_event,
+                'stuck_count': stuck_count
             }
-            st.write(
-                'The number of generations sets the maximum number of rounds the algorithm will run. '
-                'Set this conservatively to avoid overly long run times.'
-                )
-            generations = st.slider(
-                'Number of Generations', 
-                min_value=50,
-                max_value=1000,
-                value=st.session_state['ga_params']['generations'],
-                step=50
-                )
-            st.write(
-                'The population size determines how many solution candidates exist in paralllel. '
-                'Higher values increase the probability of finding a solution earlier - '
-                'while increasing computational cost.'
-                )
-            population = st.slider(
-                'Population Size', 
-                min_value=50,
-                max_value=1000,
-                value=st.session_state['ga_params']['population'],
-                step=50
-                )
-            st.write(
-                'The hall of fame size determines how many of the fittest individuals are carried over '
-                'into the next generation unaltered. Helps to preserve progress, '
-                'while increasing the risk of getting stuck in local optima. '
-                )
-            hof_size = st.slider(
-                'Hall of Fame Size', 
-                min_value=0,
-                max_value=100,
-                value=st.session_state['ga_params']['hof_size'],
-                step=1
-            )
-            st.write(
-                'The probability of mating determines how often the fittest "parent" individuals are combined '
-                'to generate "offspring" individuals in the next generation.'
-                )
-            p_mating = st.slider(
-                'Probability of Mating',
-                min_value=0.1,
-                max_value=1.0,
-                value=st.session_state['ga_params']['p_mating'],
-                step=0.05
-            )
-            st.write(
-                'The probability of mutation determines how likely individuals are altered in a generation. '
-                'While this drives the evolutionary process, high mutation rates can also interfere '
-                'whith the continuous optimization process. Adjust sparingly!'
-                )
-            p_mutation = st.slider(
-                'Probability of Mutation',
-                min_value=0.0,
-                max_value=1.0,
-                value=st.session_state['ga_params']['p_mutation'],
-                step=0.05
-            )
-            st.markdown(
-                    """
-                    To avoid getting caught in local minima you can chose one of two "shock" events.
-                    - **Radiation Leak** drastically increases mutation probability to 0.5 over a number of rounds determined by "Stuck Rounds".
-                    - **Comet Strike** wipes out all individuals apart from the hall of fame and generates a new random population.
-                    """
-                )
-            shock_event = st.radio('Shock Event', ['None', 'Radiation Leak', 'Comet Strike'], index=1)
-            st.write(
-                'Stuck rounds is the number of rounds the best fitness value must not improve before the shock event kicks in. '
-                'Comparable to "early stopping rounds" in machine learning. No effect if shock event is "None".'
-                )
-            stuck_count = st.slider(
-                'Stuck Rounds',
-                min_value=10,
-                max_value=100,
-                value=st.session_state['ga_params']['stuck_count'],
-                step=10
-            )
-            run_ga = st.form_submit_button(label='Run Algorithm :runner:', type='primary')
-            if run_ga:
-                st.session_state['ga_params'] = {
-                    'generations': generations,
-                    'population': population,
-                    'hof_size': hof_size,
-                    'p_mating': p_mating,
-                    'p_mutation': p_mutation,
-                    'shock_event': shock_event,
-                    'stuck_count': stuck_count
-                }
-                set_phase('start_ga')
-                st.rerun()
+            set_phase('start_ga')
+            st.rerun()
     
 
-elif st.session_state['phase'] == 'start_ga':
-    st.title('Sudoku Solver')
-    with st.status('Running genetic algorithm ...') as status:
-        st.write('Starting algorithm')
-        ga_solution, solved, logbook = run_ga_solver(
-            st.session_state['solution'], 
-            st.session_state['possibilities'],
-            st.session_state['ga_params']
-            )
-        set_phase('final')
-        st.write('Finalized algorithm')
-        status.update(label="Optimization complete!", state="complete")
-
-    st.session_state['solved'] = 'ga'
-    st.session_state['ga_logbook'] = logbook
-
-    if solved:
-        st.session_state['ga_solution'] = ga_solution
-        st.session_state['solution'] = ga_solution
-    
-    # st.rerun()
-    st.button('Show me the result')
-
-# present final result 
-elif st.session_state['phase'] == 'final': 
-    st.title('Sudoku Solver')
-    tab_list = ['Final Result', 'Output Greedy Algorithm']
-    greedy_message = 'Valid solutions per field could be reduced to these options:'
-
+def run_start_ga():
+    """
+    Runs final optimization phase.
+    """
     if st.session_state['solved'] == 'greedy':
         st.title('Sudoku Problem Solved! :thumbsup:')
         st.subheader('That was too easy, please enter a harder problem!')
-        greedy_message = 'Greedy algorithm has completely solved the problem:'
-    elif st.session_state.solved == 'ga':
-        tab_list.append('Output Genetic Algorithm')
+        success_message = 'This is your solution: :smiley:'
+    else:
+        st.title('Sudoku Solver')
+        with st.status('Running genetic algorithm ...') as status:
+            st.write('Starting algorithm')
+            ga_solution, solved, logbook = run_ga_solver(
+                st.session_state['solution'], 
+                st.session_state['possibilities'],
+                st.session_state['ga_params']
+                )
+            st.write('Finalized algorithm')
+            status.update(label="Optimization complete!", state="complete")
 
+        st.session_state['solved'] = 'ga'
+        st.session_state['ga_logbook'] = logbook
+
+        if solved:
+            st.session_state['ga_solution'] = ga_solution
+            st.session_state['solution'] = ga_solution
+            success_message = 'This is your solution:'
+        else:
+            success_message = 'Problem could not be solved completely: :confounded:'
+    
+    tab_list = ['Final Result', 'Output Greedy Algorithm']
+    if st.session_state['solved'] == 'ga':
+        tab_list.append('Output Genetic Algorithm')
     tabs = st.tabs(tab_list)
 
     with tabs[0]:
-        st.markdown('These fields could be solved by the app:')
-        styled = pd.DataFrame(st.session_state.solution, columns=range(1, 10), index=list(range(1, 10))) \
-            .style.apply(mark_input, axis=None, props='background-color:#a3a8b4; color:white')
+        st.markdown(success_message)
+        df_solution = pd.DataFrame(st.session_state.solution, columns=range(1, 10), index=list(range(1, 10)))
+        df_solution = df_solution.mask(df_solution==0,'')
+        styled = df_solution.style.apply(prettify_grid, axis=None)
         st.markdown(styled.hide(axis = 0).hide(axis = 1).to_html(), unsafe_allow_html=True)
         st.markdown('Dark grey fields represent your input.')
     with tabs[1]:
-        st.markdown(greedy_message)
+        st.markdown('The greedy algorithm has reduced the solution possibilities per field to these options:')
         st.dataframe(st.session_state.possibilities)
 
     if st.session_state.solved == 'ga':
@@ -400,7 +410,7 @@ elif st.session_state['phase'] == 'final':
                 {
                     'Min Fitness': min_fitness_values,
                     'Avg. Fitness': mean_fitness_values,
-                    'Generation': list(range(1, len(mean_fitness_values) + 1))
+                    'Generation': list(range(len(mean_fitness_values)))
                 }
             )
             fit_df = fit_df.melt(
@@ -423,7 +433,33 @@ elif st.session_state['phase'] == 'final':
             ).interactive()
 
             st.altair_chart(chart, use_container_width=True)
-    else: 
-        st.title('Runtime Error')
+
+def run_phase(phase):
+    """
+    Takes in phase name and runs respective phase script.
+
+    Args:
+        phase (string): name of phase to be run.
+    """
+    phases = {
+        'start': run_start,
+        'input': run_input,
+        'start_solve': run_start_solve,
+        'configure_ga': run_configure_ga,
+        'start_ga': run_start_ga
+    }
+    phases[phase]()
+
+# Run App
+if 'phase' not in st.session_state:
+    st.session_state['phase'] = 'start'
+
+if 'solved' not in st.session_state:
+    st.session_state['solved'] = 'not_solved'
+
+run_phase(st.session_state['phase'])
+
+# else: 
+#     st.title('Runtime Error')
     # for key in st.session_state.keys():
     #     del st.session_state[key]
