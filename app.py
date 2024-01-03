@@ -5,6 +5,10 @@ import src.greedy_sudoku as gs
 import src.ga_solver as ga
 import time
 import altair as alt
+from streamlit_lottie import st_lottie
+import json
+from itertools import chain
+import functools
 
 # if 'count' not in st.session_state:
 #     st.session_state['count'] = 0
@@ -73,6 +77,56 @@ def set_phase(phase):
         phase (string): name of phase
     """
     st.session_state.phase = phase
+
+def check_valid(input):
+    """
+    Check input for violations of sudoku rules, i.e. no repetitions in rows,
+    columns or 3x3 sectors.
+
+    Args:
+        input (pd.DataFrame): 9x9 array of user input
+
+    Returns:
+        str: Error message to be displayed
+    """
+    # look for numbers outside of range 0 to 9
+    numbers = input.melt()['value'].unique()
+    if any([x not in range(0, 10) for x in numbers]):
+        return(':warning: Please enter a number between 1 and 9!')
+    else:
+        # vertical violations:
+        for i in range(9):
+            numbers = input.loc[input.iloc[:, i] > 0, str(i + 1)]
+            if  len(numbers) > len(numbers.unique()):
+                return (f':warning: Repeat values in column {i+1}!')
+        # vertical violations:
+        for i in range(9):
+            numbers = input.loc[i + 1, input.iloc[i, :] > 0]
+            if  len(numbers) > len(numbers.unique()):
+                return (f':warning: Repeat values in row {i+1}!')
+        # sector violations:    
+        for i in range(0, 8, 3):
+            for j in range(0, 8, 3):
+                sector = input.iloc[i:i+3, j:j+3]
+                numbers = sector.melt()['value']
+                numbers = numbers[numbers > 0]
+                if  len(numbers) > len(numbers.unique()):
+                    return (f':warning: Repeat values in sector v {i+1}:{i+3} / h {j+1}:{j+3}!')
+
+def reset_app():
+    """
+    Delete all session states and restart app.
+    """
+    for key in st.session_state.keys():
+        del st.session_state[key]
+
+def rerun_ga():
+    """
+    Reset greedy algorithm session states only and return to GA configuration phase.
+    """
+    st.session_state['solution'] = st.session_state['greedy_solution']
+    st.session_state['solved'] = 'not_solved'
+    set_phase('configure_ga')
 
 def run_greedy(data):
     """
@@ -171,8 +225,11 @@ def run_start():
     """
     Runs script for start phase.
     """
-    st.title('Welcome to a different kind of Sudoku Solver!')
-    st.subheader('Hello Data Science Enthusiast :wave:')
+    with open("static/Animation - 1704287407021.json") as f:
+        animation = json.load(f)
+    st_lottie(animation, height=300)
+    st.title('Hello Data Science Enthusiast :wave:')
+    st.subheader('Welcome to a different kind of Sudoku Solver!')
     st.markdown(
         """
         **Genetic Algorithms** are a powerful weapon in an optimizer's armory. But can they cope
@@ -205,7 +262,7 @@ def run_input():
     """
     st.title('Sudoku Solver')
     st.markdown('Enter your Sudoku problem and press start!')
-    preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Example 1', 'Example 2', 'Example 3', 'FAIL'])
+    preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Example 1', 'Example 2', 'Example 3',]) # 'FAIL'])
     with st.form('sudoku_input'):
         if preselect == 'None':
             data = pd.DataFrame({i:['']*9 for i in range(1,10)}, index=range(1, 10))
@@ -215,16 +272,25 @@ def run_input():
             data = prep_input(SUDOKU2)
         elif preselect == 'Example 3':
             data = prep_input(SUDOKU3)
-        # elif preselect == 'FAIL':
-        #     data = prep_input(FAIL)
+        elif preselect == 'FAIL':
+            data = prep_input(FAIL)
         input = st.data_editor(data=data, num_rows='fixed', key='data_editor')
         submitted = st.form_submit_button(label='Start :runner:', type='primary')
-        # TODO: add validity check here
         if submitted:
-            input = input.mask(input=='', 0).astype(int)
+            try:
+                input = input.mask(input=='', 0).fillna(0).astype(int)
+            except:
+                st.warning(':warning: Please enter only numbers between 1 and 9!')
+                time.sleep(2)
+                st.rerun()
+            valid_message = check_valid(input)
+            if valid_message:
+                st.warning(valid_message)
+                time.sleep(2)
+                st.rerun()
             st.session_state['input'] = input
             set_phase('start_solve')
-            st.rerun()
+            st.rerun() 
 
 def run_start_solve():
     """
@@ -250,7 +316,10 @@ def run_configure_ga():
     Runs script for genetic algorithm configuration phase.    
     """
     st.title('Sudoku Solver')
-    st.markdown('The greedy algorithm has reduced the solution possibilities per field to these options:')
+    candidates =  functools.reduce(lambda x, y: x * y, [len(x) for x in chain(*st.session_state.possibilities)])
+    st.markdown(f"""
+                ###### The greedy algorithm has reduced the solution possibilities per field to the options below. Our genetic algorighm will have to find the solution among ***{candidates:.1e}*** possible combinations.
+                """)
     st.dataframe(st.session_state.possibilities)
     st.subheader('Adjust parameters for the Genetic Algorithm!')
 
@@ -380,6 +449,7 @@ def run_start_ga():
         st.session_state['ga_logbook'] = logbook
 
         if solved:
+            st.balloons()
             st.session_state['ga_solution'] = ga_solution
             st.session_state['solution'] = ga_solution
             success_message = 'This is your solution:'
@@ -405,21 +475,23 @@ def run_start_ga():
     if st.session_state.solved == 'ga':
         with tabs[2]:
             # plot statistics:
-            min_fitness_values, mean_fitness_values = st.session_state.ga_logbook.select("min", "avg")
+            min_fitness_values, mean_fitness_values, shock_event = st.session_state.ga_logbook.select("min", "avg", "shock_event")
             fit_df = pd.DataFrame(
                 {
                     'Min Fitness': min_fitness_values,
                     'Avg. Fitness': mean_fitness_values,
+                    'Shock Event': shock_event,
                     'Generation': list(range(len(mean_fitness_values)))
                 }
             )
+
             fit_df = fit_df.melt(
-                id_vars='Generation', 
+                id_vars=['Generation', 'Shock Event'],
                 value_vars=['Min Fitness', 'Avg. Fitness'],
                 value_name='Fitness',
                 var_name='Type')
 
-            chart = alt.Chart(
+            base = alt.Chart(
                 fit_df, 
                 title=alt.Title(
                     'Min and Average fitness over Generations',
@@ -432,7 +504,33 @@ def run_start_ga():
                 color=alt.Color('Type')
             ).interactive()
 
+            events_df = fit_df[
+                (fit_df['Shock Event'].str.len() > 0) &
+                (fit_df['Type'] == 'Avg. Fitness')
+                ]
+
+            dots = alt.Chart(events_df).mark_point(shape='square', size=50, color='red').encode(
+                x=alt.X('Generation:Q'),
+                y=alt.Y('Fitness:Q')
+            )
+
+            text = alt.Chart(events_df).mark_text(color='red', yOffset=-10).encode(
+                x=alt.X('Generation:Q'),
+                y=alt.Y('Fitness:Q'),
+                text='Shock Event:N'
+            )
+
+            chart = (base + dots + text)
+
             st.altair_chart(chart, use_container_width=True)
+
+    st.write('Click "Rerun Genetic Algorithm" to try out different settings or "Reset App" to start with a new input!')
+    button_cols = st.columns([0.6, 0.4])
+    with button_cols[0]:
+        st.button('Rerun Genetic Algorithm', on_click=rerun_ga, type='primary')
+    with button_cols[1]:
+        st.button('Reset App  :back:', on_click=reset_app, type='primary')
+    
 
 def run_phase(phase):
     """
@@ -461,5 +559,3 @@ run_phase(st.session_state['phase'])
 
 # else: 
 #     st.title('Runtime Error')
-    # for key in st.session_state.keys():
-    #     del st.session_state[key]
