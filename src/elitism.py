@@ -48,6 +48,7 @@ def eaSimpleWithElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
                 status_callback(f'gen {gen}, radiation is {radiation}')
 
         # Select the next generation individuals
+        shock_event=''
         if stuck[0] < stuck_count:
             if stuck[1] == 'Comet Strike':
                 # Generate new population for non-hof (Comet-Strike)
@@ -56,11 +57,13 @@ def eaSimpleWithElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
                 offspring = toolbox.populationCreator(len(population) - 3)
                 offspring.extend(halloffame.items[:3])
                 halloffame.clear()
+                shock_event = 'Comet Strike'
             if stuck[1] == 'Radiation Leak':
                 if status_callback:
                     status_callback(f'gen {gen}, radiation leak')
                 mutpb = 0.5
                 radiation = stuck[0]
+                shock_event='Radiation Leak'
             stuck_count = 0
         else:
             # Use defined selection algorithm
@@ -86,7 +89,7 @@ def eaSimpleWithElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+        logbook.record(gen=gen, nevals=len(invalid_ind), **record, radiation=radiation, shock_event=shock_event)
         log = re.split('[\s]+', str(logbook.stream))
         if status_callback and gen % verbosity == 0:
             status_callback(f"gen: {log[0]}, best: {log[2]}, mean: {log[3]}")
