@@ -517,7 +517,7 @@ def run_start_ga():
             )
             max_gen = fit_df['Generation'].max()
 
-            st.markdown(f'Your Genetic Algorithm ran for {max_gen} of {st.session_state.ga_params['generations']} generations')
+            st.markdown(f"""Your Genetic Algorithm ran for {max_gen} of {st.session_state.ga_params['generations']} generations""")
             st.markdown(
                 f"""
                 You opted for a population size of {st.session_state.ga_params['population']}, a 
