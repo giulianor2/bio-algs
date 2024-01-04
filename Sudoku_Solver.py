@@ -478,7 +478,7 @@ def run_start_ga():
             st.balloons()
             st.session_state['ga_solution'] = ga_solution
             st.session_state['solution'] = ga_solution
-            success_message = 'This is your solution:'
+            success_message = '##### This is your solution: :partying_face:'
         else:
             success_message = 'Problem could not be solved completely: :confounded:'
     
@@ -517,18 +517,18 @@ def run_start_ga():
             )
             max_gen = fit_df['Generation'].max()
 
-            st.markdown(f"""Your Genetic Algorithm ran for {max_gen} of {st.session_state.ga_params['generations']} generations""")
+            st.markdown(f"""Your Genetic Algorithm ran for {max_gen} of {st.session_state.ga_params['generations']} generations.""")
             st.markdown(
                 f"""
                 You opted for a population size of {st.session_state.ga_params['population']}, a 
                 mating probability of {st.session_state.ga_params['p_mating']}, a
-                mutation probability of {st.session_state.ga_params['p_mutation']} and 
-                a hall of fame size of {st.session_state.ga_params['hof_size']}.
+                mutation probability of {st.session_state.ga_params['p_mutation']}  
+                and a hall of fame size of {st.session_state.ga_params['hof_size']}.
                 """)
             st.markdown(
                 f"""
                 You ordered a {st.session_state.ga_params['shock_event']}
-                after {st.session_state.ga_params['stuck_count']} generations of stagnation.
+                after {st.session_state.ga_params['stuck_count']} consecutive generations of stagnation.
                 """)
             
 
