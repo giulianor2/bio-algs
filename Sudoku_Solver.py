@@ -10,6 +10,11 @@ import json
 from itertools import chain
 import functools
 
+st.set_page_config(
+    page_title="Genetic Sudoku Solver",
+    page_icon=":gear:"
+    )
+
 # if 'count' not in st.session_state:
 #     st.session_state['count'] = 0
 
@@ -118,7 +123,9 @@ def reset_app():
     Delete all session states and restart app.
     """
     for key in st.session_state.keys():
-        del st.session_state[key]
+        if key != 'input':
+            del st.session_state[key]
+    st.session_state['phase'] = 'input'
 
 def rerun_ga():
     """
@@ -128,6 +135,7 @@ def rerun_ga():
     st.session_state['solved'] = 'not_solved'
     set_phase('configure_ga')
 
+@st.cache_data
 def run_greedy(data):
     """
     Starts greedy algorithm based on user input. 
@@ -152,6 +160,7 @@ def run_greedy(data):
 
     return greedy_problem.get_solution(), greedy_problem.get_possibilities()
 
+@st.cache_data
 def run_ga_solver(solution_data, possibilities_data, ga_params):
     """
     Starts Genetic Algorithm based on solution and possibilities returned
@@ -216,7 +225,10 @@ def prep_input(data):
     Returns:
         pd.DataFrame: 9x9 dataframe with strings of integers between 1 and 9 plus empty strings.
     """
-    df = pd.DataFrame(data, index=range(1, 10), columns=range(1, 10))
+    if isinstance(data, pd.DataFrame):
+        df = data.copy()
+    else:
+        df = pd.DataFrame(data, index=range(1, 10), columns=range(1, 10))
     df = df.astype(str)
     df = df.mask(df=='0', '')
     return df
@@ -240,7 +252,7 @@ def run_start():
         You will start by entering your own Sudoku problem or selecting
         from a small range of examples.
         
-        In a first step a greedy alogorithm will narrow down the potential candidate numbers 
+        In a first step a greedy algorithm will narrow down the potential candidate numbers 
         for each cell. This makes the problem manageable for the GA part.  
         
         Next you can set parameters for a genetic algorithm to steer its performance.  
@@ -248,7 +260,7 @@ def run_start():
         Finally you will be able to inspect the results of your algorithm
         and either rerun it with different parameters or start out with a new problem.  
 
-        And now withouth further ado ...
+        And now without further ado ...
         """
     )
     start = st.button("Let's get started :rocket:", type='primary')
@@ -262,10 +274,15 @@ def run_input():
     """
     st.title('Sudoku Solver')
     st.markdown('Enter your Sudoku problem and press start!')
-    preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Example 1', 'Example 2', 'Example 3',]) # 'FAIL'])
+    preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Last', 'Example 1', 'Example 2', 'Example 3'])# , 'FAIL'])
     with st.form('sudoku_input'):
         if preselect == 'None':
             data = pd.DataFrame({i:['']*9 for i in range(1,10)}, index=range(1, 10))
+        elif preselect == 'Last':
+            if 'input' in st.session_state:
+                data = prep_input(st.session_state['input'])
+            else:
+                data = pd.DataFrame({i:['']*9 for i in range(1,10)}, index=range(1, 10))
         elif preselect == 'Example 1':
             data = prep_input(SUDOKU1)
         elif preselect == 'Example 2':
@@ -317,112 +334,120 @@ def run_configure_ga():
     """
     st.title('Sudoku Solver')
     candidates =  functools.reduce(lambda x, y: x * y, [len(x) for x in chain(*st.session_state.possibilities)])
-    st.markdown(f"""
-                ###### The greedy algorithm has reduced the solution possibilities per field to the options below. Our genetic algorighm will have to find the solution among ***{candidates:.1e}*** possible combinations.
-                """)
-    st.dataframe(st.session_state.possibilities)
-    st.subheader('Adjust parameters for the Genetic Algorithm!')
-
-    with st.form('ga_options_select', border=False):
-        st.session_state['ga_params'] = {
-            'generations': 500,
-            'population': 1000,
-            'hof_size': 50,
-            'p_mating': 0.9,
-            'p_mutation': 0.2,
-            'shock_event': 'Radiation Leak',
-            'stuck_count': 50
-        }        
-        generations = st.slider(
-            'Number of Generations', 
-            min_value=50,
-            max_value=1000,
-            value=st.session_state['ga_params']['generations'],
-            step=50
-            )
-        st.write(
-            'The number of generations sets the maximum number of rounds the algorithm will run. '
-            'Set this conservatively to avoid overly long run times.'
-            )        
-        population = st.slider(
-            'Population Size', 
-            min_value=50,
-            max_value=1000,
-            value=st.session_state['ga_params']['population'],
-            step=50
-            )
-        st.write(
-            'The population size determines how many solution candidates exist in paralllel. '
-            'Higher values increase the probability of finding a solution earlier - '
-            'while increasing computational cost.'
-            )
-        hof_size = st.slider(
-            'Hall of Fame Size', 
-            min_value=0,
-            max_value=100,
-            value=st.session_state['ga_params']['hof_size'],
-            step=1
-        )
-        st.write(
-            'The hall of fame size determines how many of the fittest individuals are carried over '
-            'into the next generation unaltered. Helps to preserve progress, '
-            'while increasing the risk of getting stuck in local optima. '
-            )
-        p_mating = st.slider(
-            'Probability of Mating',
-            min_value=0.1,
-            max_value=1.0,
-            value=st.session_state['ga_params']['p_mating'],
-            step=0.05
-        )
-        st.write(
-            'The probability of mating determines how often the fittest "parent" individuals are combined '
-            'to generate "offspring" individuals in the next generation.'
-            )
-        p_mutation = st.slider(
-            'Probability of Mutation',
-            min_value=0.0,
-            max_value=1.0,
-            value=st.session_state['ga_params']['p_mutation'],
-            step=0.05
-        )
-        st.write(
-            'The probability of mutation determines how likely individuals are altered in a generation. '
-            'While this drives the evolutionary process, high mutation rates can also interfere '
-            'whith the continuous optimization process. Adjust sparingly!'
-            )
-        shock_event = st.radio('Shock Event', ['None', 'Radiation Leak', 'Comet Strike'], index=1)
-        st.markdown(
-                """
-                To avoid getting caught in local minima you can chose one of two "shock" events.
-                - **Radiation Leak** drastically increases mutation probability to 0.5 over a number of rounds determined by "Stuck Rounds".
-                - **Comet Strike** wipes out all individuals apart from the hall of fame and generates a new random population.
-                """
-            )
-        stuck_count = st.slider(
-            'Stuck Rounds',
-            min_value=10,
-            max_value=100,
-            value=st.session_state['ga_params']['stuck_count'],
-            step=10
-        )
-        st.write(
-            'Stuck rounds is the number of rounds the best fitness value must not improve before the shock event kicks in. '
-            'Comparable to "early stopping rounds" in machine learning. No effect if shock event is "None".'
-            )
-        run_ga = st.form_submit_button(label='Run Algorithm :runner:', type='primary')
-        if run_ga:
-            st.session_state['ga_params'] = {
-                'generations': generations,
-                'population': population,
-                'hof_size': hof_size,
-                'p_mating': p_mating,
-                'p_mutation': p_mutation,
-                'shock_event': shock_event,
-                'stuck_count': stuck_count
-            }
-            set_phase('start_ga')
-            st.rerun()
+    if candidates == 0:
+        st.markdown('###### Your Sudoku Problem cannot be solved. Please check your input! :worried:')
+        st.dataframe(st.session_state.possibilities)
+        st.button('Reset App  :back:', on_click=reset_app, type='primary')
+    else:
+        st.markdown(f"""
+                    ###### The greedy algorithm has reduced the solution possibilities per field to the options below. Our genetic algorithm will have to find the solution among ***{candidates:.1e}*** possible combinations.
+                    """)
+        st.dataframe(st.session_state.possibilities)
+        
+        st.session_state['input_form'] = st.empty()
+        with st.session_state['input_form']:
+            st.subheader('Adjust parameters for the Genetic Algorithm!')
+            with st.form('ga_options_select', border=False):
+                if 'ga_params' not in st.session_state:
+                    st.session_state['ga_params'] = {
+                        'generations': 500,
+                        'population': 1000,
+                        'hof_size': 50,
+                        'p_mating': 0.9,
+                        'p_mutation': 0.2,
+                        'shock_event': 'Radiation Leak',
+                        'stuck_count': 50
+                    }        
+                generations = st.slider(
+                    'Number of Generations', 
+                    min_value=50,
+                    max_value=1000,
+                    value=st.session_state['ga_params']['generations'],
+                    step=50
+                    )
+                st.write(
+                    'The number of generations sets the maximum number of rounds the algorithm will run. '
+                    'Set this conservatively to avoid overly long run times.'
+                    )        
+                population = st.slider(
+                    'Population Size', 
+                    min_value=50,
+                    max_value=1000,
+                    value=st.session_state['ga_params']['population'],
+                    step=50
+                    )
+                st.write(
+                    'The population size determines how many solution candidates exist in parallel. '
+                    'Higher values increase the probability of finding a solution earlier - '
+                    'while increasing computational cost.'
+                    )
+                hof_size = st.slider(
+                    'Hall of Fame Size', 
+                    min_value=0,
+                    max_value=100,
+                    value=st.session_state['ga_params']['hof_size'],
+                    step=1
+                )
+                st.write(
+                    'The hall of fame size determines how many of the fittest individuals are carried over '
+                    'into the next generation unaltered. Helps to preserve progress, '
+                    'while increasing the risk of getting stuck in local optima. '
+                    )
+                p_mating = st.slider(
+                    'Probability of Mating',
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=st.session_state['ga_params']['p_mating'],
+                    step=0.05
+                )
+                st.write(
+                    'The probability of mating determines how often the fittest "parent" individuals are combined '
+                    'to generate "offspring" individuals in the next generation.'
+                    )
+                p_mutation = st.slider(
+                    'Probability of Mutation',
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=st.session_state['ga_params']['p_mutation'],
+                    step=0.05
+                )
+                st.write(
+                    'The probability of mutation determines how likely individuals are altered in a generation. '
+                    'While this drives the evolutionary process, high mutation rates can also interfere '
+                    'with the continuous optimization process. Adjust sparingly!'
+                    )
+                shock_event = st.radio('Shock Event', ['None', 'Radiation Leak', 'Comet Strike'], index=1)
+                st.markdown(
+                        """
+                        To avoid getting caught in local minima you can chose one of two "shock" events.
+                        - **Radiation Leak** drastically increases mutation probability to 0.5 over a number of rounds determined by "Stuck Rounds".
+                        - **Comet Strike** wipes out all individuals apart from the hall of fame and generates a new random population.
+                        """
+                    )
+                stuck_count = st.slider(
+                    'Stuck Rounds',
+                    min_value=10,
+                    max_value=100,
+                    value=st.session_state['ga_params']['stuck_count'],
+                    step=10
+                )
+                st.write(
+                    'Stuck rounds is the number of rounds the best fitness value must not improve before the shock event kicks in. '
+                    'Comparable to "early stopping rounds" in machine learning. No effect if shock event is "None".'
+                    )
+                run_ga = st.form_submit_button(label='Run Algorithm :runner:', type='primary')
+                if run_ga:
+                    st.session_state['ga_params'] = {
+                        'generations': generations,
+                        'population': population,
+                        'hof_size': hof_size,
+                        'p_mating': p_mating,
+                        'p_mutation': p_mutation,
+                        'shock_event': shock_event,
+                        'stuck_count': stuck_count
+                    }
+                    set_phase('start_ga')
+                    st.rerun()
     
 
 def run_start_ga():
@@ -432,9 +457,10 @@ def run_start_ga():
     if st.session_state['solved'] == 'greedy':
         st.title('Sudoku Problem Solved! :thumbsup:')
         st.subheader('That was too easy, please enter a harder problem!')
-        success_message = 'This is your solution: :smiley:'
+        success_message = 'This is your solution: :partying_face:'
     else:
         st.title('Sudoku Solver')
+        st.session_state['input_form'].empty()
         with st.status('Running genetic algorithm ...') as status:
             st.write('Starting algorithm')
             ga_solution, solved, logbook = run_ga_solver(
@@ -469,7 +495,12 @@ def run_start_ga():
         st.markdown(styled.hide(axis = 0).hide(axis = 1).to_html(), unsafe_allow_html=True)
         st.markdown('Dark grey fields represent your input.')
     with tabs[1]:
-        st.markdown('The greedy algorithm has reduced the solution possibilities per field to these options:')
+        candidates =  functools.reduce(lambda x, y: x * y, [len(x) for x in chain(*st.session_state.possibilities)])
+        st.markdown(
+            f"""
+            The greedy algorithm had reduced the solution possibilities per field to the options below. Our genetic algorithm 
+            had to find the solution among **{candidates:.1e}** possible combinations.
+            """)
         st.dataframe(st.session_state.possibilities)
 
     if st.session_state.solved == 'ga':
@@ -484,10 +515,26 @@ def run_start_ga():
                     'Generation': list(range(len(mean_fitness_values)))
                 }
             )
+            max_gen = fit_df['Generation'].max()
+
+            st.markdown(f'Your Genetic Algorithm ran for {max_gen} of {st.session_state.ga_params['generations']} generations')
+            st.markdown(
+                f"""
+                You opted for a population size of {st.session_state.ga_params['population']}, a 
+                mating probability of {st.session_state.ga_params['p_mating']}, a
+                mutation probability of {st.session_state.ga_params['p_mutation']} and 
+                a hall of fame size of {st.session_state.ga_params['hof_size']}.
+                """)
+            st.markdown(
+                f"""
+                You ordered a {st.session_state.ga_params['shock_event']}
+                after {st.session_state.ga_params['stuck_count']} generations of stagnation.
+                """)
+            
 
             fit_df = fit_df.melt(
                 id_vars=['Generation', 'Shock Event'],
-                value_vars=['Min Fitness', 'Avg. Fitness'],
+                value_vars=['Avg. Fitness', 'Min Fitness'],
                 value_name='Fitness',
                 var_name='Type')
 
