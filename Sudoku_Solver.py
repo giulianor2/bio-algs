@@ -49,7 +49,7 @@ SUDOKU2 = [
         ]
 
 SUDOKU3 = [
-            [9, 0, 2, 0, 0, 0, 1, 0, 0],
+            [9, 0, 2, 0, 0, 0, 0, 0, 0],
             [0, 4, 0, 2, 0, 7, 0, 3, 0],
             [0, 0, 0, 0, 5, 0, 0, 0, 0],
             [0, 8, 0, 0, 6, 0, 0, 0, 0],
@@ -61,7 +61,7 @@ SUDOKU3 = [
         ]
 
 FAIL = [
-            [9, 2, 2, 0, 0, 0, 1, 0, 0],
+            [9, 2, 2, 0, 0, 0, 0, 0, 0],
             [0, 4, 0, 2, 0, 7, 0, 3, 0],
             [0, 0, 0, 0, 5, 0, 0, 0, 0],
             [0, 8, 0, 0, 6, 0, 0, 0, 0],
@@ -240,8 +240,8 @@ def run_start():
     with open("static/Animation - 1704287407021.json") as f:
         animation = json.load(f)
     st_lottie(animation, height=300)
-    st.title('Hello Data Science Enthusiast :wave:')
-    st.subheader('Welcome to a different kind of Sudoku Solver!')
+    st.title('Genetic Algorithms')
+    st.subheader('Welcome to a different kind of Sudoku Solver! :writing_hand:')
     st.markdown(
         """
         **Genetic Algorithms** are a powerful weapon in an optimizer's armory. But can they cope
@@ -272,7 +272,7 @@ def run_input():
     """
     Runs script for input phase.
     """
-    st.title('Sudoku Solver')
+    st.title('Genetic Sudoku Solver')
     st.markdown('Enter your Sudoku problem and press start!')
     preselect = st.sidebar.selectbox('Start with an example', options=['None', 'Last', 'Example 1', 'Example 2', 'Example 3'])# , 'FAIL'])
     with st.form('sudoku_input'):
@@ -313,7 +313,7 @@ def run_start_solve():
     """
     Runs script for greed solution phase.
     """
-    st.title('Sudoku Solver')
+    st.title('Genetic Sudoku Solver')
     greedy_solved, greedy_possibilities = run_greedy(st.session_state.input)
     greedy_solution, solved = greedy_solved
     st.session_state['greedy_solution'] = greedy_solution
@@ -332,7 +332,7 @@ def run_configure_ga():
     """
     Runs script for genetic algorithm configuration phase.    
     """
-    st.title('Sudoku Solver')
+    st.title('Genetic Sudoku Solver')
     candidates =  functools.reduce(lambda x, y: x * y, [len(x) for x in chain(*st.session_state.possibilities)])
     if candidates == 0:
         st.markdown('###### Your Sudoku Problem cannot be solved. Please check your input! :worried:')
@@ -459,7 +459,7 @@ def run_start_ga():
         st.subheader('That was too easy, please enter a harder problem!')
         success_message = 'This is your solution: :partying_face:'
     else:
-        st.title('Sudoku Solver')
+        st.title('Genetic Sudoku Solver')
         st.session_state['input_form'].empty()
         with st.status('Running genetic algorithm ...') as status:
             st.write('Starting algorithm')
@@ -498,7 +498,7 @@ def run_start_ga():
         candidates =  functools.reduce(lambda x, y: x * y, [len(x) for x in chain(*st.session_state.possibilities)])
         st.markdown(
             f"""
-            The greedy algorithm had reduced the solution possibilities per field to the options below. Our genetic algorithm 
+            The greedy algorithm had reduced the solution possibilities per field to the options below. Your genetic algorithm 
             had to find the solution among **{candidates:.1e}** possible combinations.
             """)
         st.dataframe(st.session_state.possibilities)
